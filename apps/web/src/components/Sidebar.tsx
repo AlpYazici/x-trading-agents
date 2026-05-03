@@ -8,9 +8,7 @@ import {
   ArrowLeftRight,
   Settings,
   Brain,
-  GitCompare,
   Sparkles,
-  DollarSign,
   Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,13 +17,11 @@ const links = [
   { href: "/", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/agent", label: "Agentic", Icon: Brain, badge: "AI" },
   { href: "/runs", label: "Runs", Icon: Activity },
-  { href: "/compare", label: "Compare", Icon: GitCompare },
   { href: "/reflection", label: "Reflection", Icon: Sparkles },
   { href: "/portfolio", label: "Portfolio", Icon: Briefcase },
   { href: "/trades", label: "Trades", Icon: ArrowLeftRight },
   { href: "/closed", label: "Closed", Icon: ArrowLeftRight },
   { href: "/schedules", label: "Schedules", Icon: Calendar },
-  { href: "/costs", label: "Costs", Icon: DollarSign },
   { href: "/settings", label: "Settings", Icon: Settings },
 ];
 
