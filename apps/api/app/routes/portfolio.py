@@ -26,16 +26,22 @@ def get_portfolio() -> dict:
 
 
 @router.get("/history")
-def get_history(days: int = 30, backfill: bool = True):
+def get_history(
+    days: int = 30,
+    period: str | None = None,
+    interval: str = "1d",
+    backfill: bool = True,
+):
     """Historical portfolio value.
 
-    backfill=True (default): compute from yfinance OHLC assuming current
-      holdings existed for the entire window. Best for fresh installs.
-    backfill=False: only show actual snapshots (real history if you've been
-      running the system for a while).
+    Args:
+        days: shorthand — used only when `period` is None
+        period: yfinance period ("1d", "5d", "1mo", "3mo", "1y", "5y")
+        interval: yfinance interval ("5m", "15m", "1h", "1d", "1wk")
+        backfill: True = compute from yfinance OHLC; False = stored snapshots
     """
     if backfill:
-        return snapshots.get_backfilled_history(days=days)
+        return snapshots.get_backfilled_history(days=days, period=period, interval=interval)
     return snapshots.get_history(days=days)
 
 

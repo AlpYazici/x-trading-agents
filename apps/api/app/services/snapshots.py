@@ -82,16 +82,22 @@ def get_history(days: int = 30) -> list[dict]:
         ]
 
 
-def get_backfilled_history(days: int = 90) -> list[dict]:
+def get_backfilled_history(days: int = 90, period: str | None = None, interval: str = "1d") -> list[dict]:
     """Compute historical portfolio value from yfinance OHLC.
 
     Assumes current holdings existed for the entire window. Cost basis is
-    computed at current FX. Returns daily series with total_usd + total_pl_usd.
+    computed at current FX. Returns time series at requested interval.
+
+    Args:
+        days: convenience — used only when `period` is None
+        period: yfinance period string (e.g. "1d", "5d", "1mo", "3mo", "1y")
+        interval: yfinance interval ("5m", "15m", "1h", "1d", "1wk")
     """
     import yfinance as yf
     import pandas as pd
 
-    period = _period_for_days(days)
+    if period is None:
+        period = _period_for_days(days)
     with Session(engine) as s:
         holdings = s.exec(select(Holding).order_by(Holding.id)).all()  # type: ignore[arg-type]
 
@@ -106,39 +112,57 @@ def get_backfilled_history(days: int = 90) -> list[dict]:
 
     fx_series_cache: dict[str, "pd.Series"] = {}
 
-    def _get_fx_series(ccy: str) -> "pd.Series | None":
+    def _get_fx_series(ccy: str, period: str = "5d", interval: str = "1d") -> "pd.Series | None":
         if ccy == "USD":
             return None
-        if ccy in fx_series_cache:
-            return fx_series_cache[ccy]
-        try:
-            fx_hist = yf.Ticker(f"{ccy}USD=X").history(period=period, interval="1d")
-            if len(fx_hist) > 0:
-                fx_series_cache[ccy] = fx_hist["Close"]
-                return fx_hist["Close"]
-        except Exception:
-            pass
+        cache_key = f"{ccy}-{period}-{interval}"
+        if cache_key in fx_series_cache:
+            return fx_series_cache[cache_key]
+        # Try requested granularity first
+        for try_interval in (interval, "1d"):
+            try:
+                fx_hist = yf.Ticker(f"{ccy}USD=X").history(period=period, interval=try_interval)
+                if len(fx_hist) > 0:
+                    fx_series_cache[cache_key] = fx_hist["Close"]
+                    return fx_hist["Close"]
+            except Exception:
+                continue
+            # FX has no intraday on weekends — fall back to daily 5d
+            if try_interval != "1d":
+                try:
+                    fx_hist = yf.Ticker(f"{ccy}USD=X").history(period="5d", interval="1d")
+                    if len(fx_hist) > 0:
+                        fx_series_cache[cache_key] = fx_hist["Close"]
+                        return fx_hist["Close"]
+                except Exception:
+                    continue
         return None
 
     for h in holdings:
         yf_sym = holdings_svc.yf_symbol(h.symbol, h.exchange)
         try:
-            hist = yf.Ticker(yf_sym).history(period=period, interval="1d")
+            hist = yf.Ticker(yf_sym).history(period=period, interval=interval)
         except Exception:
             continue
         if len(hist) == 0:
             continue
 
-        fx_series = _get_fx_series(h.currency)
+        # FX series at same granularity (FX trades 24/5, so daily fallback for short intervals if intraday FX unavailable)
+        fx_series = _get_fx_series(h.currency, period=period, interval=interval)
         # current FX for cost basis
         cur_fx = holdings_svc.fx_rate(h.currency, "USD") or 1.0
         fx_today[h.currency] = cur_fx
         cost_usd_total += h.qty * h.entry_price * cur_fx
 
-        # Iterate daily closes — normalize timestamp to date string
+        # Iterate bars — normalize timestamp. For intraday intervals keep
+        # full ISO datetime so multiple bars per day are distinct.
+        is_intraday = interval not in ("1d", "1wk", "1mo")
         for ts, row in hist.iterrows():
             close = float(row["Close"])
-            date_key = ts.date().isoformat()  # type: ignore[union-attr]
+            if is_intraday:
+                date_key = pd.Timestamp(ts).strftime("%Y-%m-%dT%H:%M")  # type: ignore[union-attr]
+            else:
+                date_key = ts.date().isoformat()  # type: ignore[union-attr]
 
             # FX for this date
             if fx_series is not None:

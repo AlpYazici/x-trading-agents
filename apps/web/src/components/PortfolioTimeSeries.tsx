@@ -20,21 +20,25 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const RANGES = [
-  { label: "7D", days: 7 },
-  { label: "30D", days: 30 },
-  { label: "90D", days: 90 },
-  { label: "1Y", days: 365 },
-  { label: "All", days: 3650 },
+  { label: "1H", period: "1d",  interval: "5m"  },
+  { label: "1D", period: "2d",  interval: "15m" },
+  { label: "1W", period: "5d",  interval: "1h"  },
+  { label: "1M", period: "1mo", interval: "1d"  },
+  { label: "3M", period: "3mo", interval: "1d"  },
+  { label: "1Y", period: "1y",  interval: "1d"  },
 ];
 
 export function PortfolioTimeSeries() {
   const qc = useQueryClient();
-  const [rangeIdx, setRangeIdx] = useState(1);
-  const days = RANGES[rangeIdx].days;
+  const [rangeIdx, setRangeIdx] = useState(3);  // default 1M
+  const range = RANGES[rangeIdx];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["history", days],
-    queryFn: () => apiGet<Snapshot[]>(`/portfolio/history?days=${days}`),
+    queryKey: ["history", range.period, range.interval],
+    queryFn: () =>
+      apiGet<Snapshot[]>(
+        `/portfolio/history?period=${range.period}&interval=${range.interval}`
+      ),
     refetchInterval: 60_000,
   });
 
@@ -44,17 +48,27 @@ export function PortfolioTimeSeries() {
     qc.invalidateQueries({ queryKey: ["history"] });
   }
 
+  const isIntraday = ["5m", "15m", "1h"].includes(range.interval);
   const series =
-    data?.map((s) => ({
-      ts: new Date(s.ts).getTime(),
-      label: new Date(s.ts).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: data.length < 50 ? "2-digit" : undefined,
-      }),
-      total: Math.round(s.total_usd),
-      pl: Math.round(s.total_pl_usd),
-    })) ?? [];
+    data?.map((s) => {
+      const d = new Date(s.ts);
+      return {
+        ts: d.getTime(),
+        label: isIntraday
+          ? d.toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : d.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            }),
+        total: Math.round(s.total_usd),
+        pl: Math.round(s.total_pl_usd),
+      };
+    }) ?? [];
 
   const last = series[series.length - 1];
   const first = series[0];
@@ -123,7 +137,7 @@ export function PortfolioTimeSeries() {
                 {fmt(periodChange)} ({(periodPct * 100).toFixed(2)}%)
               </span>
               <span className="text-xs text-muted-foreground">
-                {RANGES[rangeIdx].label}
+                {range.label} · {range.interval}
               </span>
             </div>
             <ResponsiveContainer width="100%" height={240}>
