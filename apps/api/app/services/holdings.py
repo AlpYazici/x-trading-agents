@@ -66,9 +66,11 @@ def get_price(symbol: str, exchange: str) -> Optional[float]:
 
 @lru_cache(maxsize=8)
 def _fx_cached(pair: str, ts_bucket: int) -> Optional[float]:
-    """FX cached per 60s bucket."""
+    """FX cached per 60s bucket. Use 5d period to handle weekends/holidays
+    (FX markets close Fri evening through Sun evening UTC; period=1d returns 0
+    rows on weekends and holidays)."""
     try:
-        h = yf.Ticker(pair).history(period="1d")
+        h = yf.Ticker(pair).history(period="5d")
         if len(h) > 0:
             return float(h["Close"].iloc[-1])
     except Exception as e:

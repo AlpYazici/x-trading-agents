@@ -8,10 +8,11 @@ export type MarketDef = {
   unit?: string;
 };
 
-export type GroupKey = "stocks" | "indices" | "currencies" | "commodities";
+export type GroupKey = "stocks" | "crypto" | "indices" | "currencies" | "commodities";
 
 const KEYS: Record<GroupKey, string> = {
   stocks: "tac_grp_stocks_v1",
+  crypto: "tac_grp_crypto_v1",
   indices: "tac_grp_indices_v1",
   currencies: "tac_grp_currencies_v1",
   commodities: "tac_grp_commodities_v1",
@@ -19,6 +20,7 @@ const KEYS: Record<GroupKey, string> = {
 
 export const GROUP_LABELS: Record<GroupKey, string> = {
   stocks: "Stocks",
+  crypto: "Crypto",
   indices: "Indices",
   currencies: "Currencies",
   commodities: "Commodities",
@@ -37,6 +39,13 @@ export const DEFAULTS: Record<GroupKey, MarketDef[]> = {
     { label: "MU", symbol: "MU", exchange: "US" },
     { label: "PLTR", symbol: "PLTR", exchange: "US" },
     { label: "SONY", symbol: "SONY", exchange: "US" },
+  ],
+  crypto: [
+    { label: "Bitcoin",  symbol: "BTC-USD", exchange: "CRYPTO", unit: "USD" },
+    { label: "Ethereum", symbol: "ETH-USD", exchange: "CRYPTO", unit: "USD" },
+    { label: "Solana",   symbol: "SOL-USD", exchange: "CRYPTO", unit: "USD" },
+    { label: "XRP",      symbol: "XRP-USD", exchange: "CRYPTO", unit: "USD" },
+    { label: "Cardano",  symbol: "ADA-USD", exchange: "CRYPTO", unit: "USD" },
   ],
   indices: [
     { label: "S&P 500", symbol: "^GSPC", exchange: "US" },

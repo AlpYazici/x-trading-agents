@@ -8,6 +8,7 @@ import {
   Banknote,
   Flame,
   Building2,
+  Bitcoin,
   X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ export function MarketsGroups() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <MarketGroup group="stocks" title="Stocks" Icon={Building2} accent="violet" />
+      <MarketGroup group="crypto" title="Crypto" Icon={Bitcoin} accent="orange" />
       <MarketGroup group="indices" title="Indices" Icon={BarChart3} accent="blue" />
       <MarketGroup group="currencies" title="Currencies" Icon={Banknote} accent="emerald" />
       <MarketGroup group="commodities" title="Commodities" Icon={Flame} accent="amber" />
@@ -48,7 +50,7 @@ function MarketGroup({
   group: GroupKey;
   title: string;
   Icon: React.ComponentType<{ className?: string }>;
-  accent: "violet" | "blue" | "emerald" | "amber";
+  accent: "violet" | "blue" | "emerald" | "amber" | "orange";
 }) {
   const { list, remove } = useMarketGroup(group);
   const accents = {
@@ -56,6 +58,7 @@ function MarketGroup({
     blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
     emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
   }[accent];
 
   const queries = useQueries({

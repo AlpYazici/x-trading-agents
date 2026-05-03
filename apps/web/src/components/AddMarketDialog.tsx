@@ -31,6 +31,15 @@ const SUGGESTIONS: Record<GroupKey, { label: string; symbol: string; unit?: stri
     { label: "Coinbase", symbol: "COIN" },
     { label: "Berkshire", symbol: "BRK-B" },
   ],
+  crypto: [
+    { label: "Bitcoin", symbol: "BTC-USD" },
+    { label: "Ethereum", symbol: "ETH-USD" },
+    { label: "Solana", symbol: "SOL-USD" },
+    { label: "XRP", symbol: "XRP-USD" },
+    { label: "Cardano", symbol: "ADA-USD" },
+    { label: "Dogecoin", symbol: "DOGE-USD" },
+    { label: "Avalanche", symbol: "AVAX-USD" },
+  ],
   indices: [
     { label: "Nasdaq 100", symbol: "^NDX" },
     { label: "Dow Jones", symbol: "^DJI" },
@@ -74,7 +83,8 @@ export function AddMarketDialog({ defaultGroup, trigger }: Props) {
   const indices = useMarketGroup("indices");
   const currencies = useMarketGroup("currencies");
   const commodities = useMarketGroup("commodities");
-  const groups = { stocks, indices, currencies, commodities };
+  const crypto = useMarketGroup("crypto");
+  const groups = { stocks, crypto, indices, currencies, commodities };
 
   function onSymbolChange(v: string) {
     setSymbol(v.toUpperCase());

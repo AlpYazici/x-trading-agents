@@ -138,11 +138,55 @@ def unregister_schedule(schedule_id: int) -> None:
         sched.remove_job(jid)
 
 
+def seed_default_schedules() -> None:
+    """First-run setup: 2 daily scans (pre-market + post-close ET).
+
+    Times chosen for a Turkey-based user (UTC+3):
+      - 09:00 ET = 16:00 Istanbul (afternoon)
+      - 16:30 ET = 23:30 Istanbul (late evening)
+
+    Watchlist defaults to the 5 highest-volume megacap tech tickers; user can
+    edit symbols + cron via the /schedules page.
+    """
+    with Session(engine) as s:
+        existing = s.exec(select(Schedule)).all()
+        if existing:
+            return  # don't seed if user already has schedules
+        defaults = [
+            Schedule(
+                name="Daily pre-market scan",
+                symbols="NVDA,AAPL,MSFT,META,TSLA",
+                cron="0 9 * * 1-5",
+                timezone="America/New_York",
+                enabled=True,
+                notes="Auto-seeded on first start. Edit on /schedules.",
+            ),
+            Schedule(
+                name="Daily post-close scan",
+                symbols="NVDA,AAPL,MSFT,META,TSLA",
+                cron="30 16 * * 1-5",
+                timezone="America/New_York",
+                enabled=True,
+                notes="Auto-seeded on first start. Edit on /schedules.",
+            ),
+        ]
+        for d in defaults:
+            s.add(d)
+        s.commit()
+        logger.info("seeded %d default schedules", len(defaults))
+
+
 def start_scheduler() -> None:
     sched = get_scheduler()
     if sched.running:
         return
     sched.start()
+
+    # First-run seed (if no schedules exist).
+    try:
+        seed_default_schedules()
+    except Exception:
+        logger.exception("seed_default_schedules failed")
 
     # Re-register all enabled schedules.
     with Session(engine) as s:

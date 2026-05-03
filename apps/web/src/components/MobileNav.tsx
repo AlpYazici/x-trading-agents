@@ -18,6 +18,7 @@ const links = [
   { href: "/", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/agent", label: "Agentic", Icon: Brain },
   { href: "/runs", label: "Runs", Icon: Activity },
+  { href: "/recommendations", label: "Picks", Icon: Sparkles },
   { href: "/reflection", label: "Reflection", Icon: Sparkles },
   { href: "/portfolio", label: "Portfolio", Icon: Briefcase },
   { href: "/trades", label: "Trades", Icon: ArrowLeftRight },
