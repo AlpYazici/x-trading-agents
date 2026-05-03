@@ -6,6 +6,61 @@ import yfinance as yf
 import os
 from .stockstats_utils import StockstatsUtils, _clean_dataframe, yf_retry, load_ohlcv, filter_financials_by_date
 
+
+# Known international exchanges yfinance supports via suffix:
+#   .IS   = Borsa Istanbul (Turkey)
+#   .L    = London Stock Exchange
+#   .DE   = Frankfurt (XETRA)
+#   .PA   = Euronext Paris
+#   .AS   = Euronext Amsterdam
+#   .HK   = Hong Kong
+#   .T    = Tokyo
+#   .KS   = Korea (KOSPI), .KQ = KOSDAQ
+#   .SS   = Shanghai, .SZ = Shenzhen
+#   .SA   = São Paulo (Brazil)
+#   .MX   = Mexican Bolsa
+_FALLBACK_SUFFIXES = [".IS", ".L", ".DE", ".PA", ".AS", ".HK", ".T", ".KS", ".SA"]
+
+
+def _resolve_symbol(raw: str) -> str:
+    """Find the yfinance symbol that has data.
+
+    If the bare uppercase symbol returns data, use it. Otherwise try the
+    common international suffixes (.IS for Turkish, .L for UK, etc) and
+    return the first that resolves. Memoized in-process.
+    """
+    sym = raw.upper().strip()
+    if sym in _resolve_cache:
+        return _resolve_cache[sym]
+    # Already qualified (contains . or - or =) → use as is
+    if any(c in sym for c in (".", "=", "-")):
+        _resolve_cache[sym] = sym
+        return sym
+    # Try the bare symbol first
+    try:
+        h = yf.Ticker(sym).history(period="5d")
+        if len(h) > 0:
+            _resolve_cache[sym] = sym
+            return sym
+    except Exception:
+        pass
+    # Fall back through suffixes
+    for suf in _FALLBACK_SUFFIXES:
+        candidate = sym + suf
+        try:
+            h = yf.Ticker(candidate).history(period="5d")
+            if len(h) > 0:
+                _resolve_cache[sym] = candidate
+                return candidate
+        except Exception:
+            continue
+    _resolve_cache[sym] = sym  # last-resort fallback
+    return sym
+
+
+_resolve_cache: dict[str, str] = {}
+
+
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -15,8 +70,11 @@ def get_YFin_data_online(
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
 
+    # Resolve symbol to its actual yfinance form (handles BIST .IS, LSE .L, etc.)
+    resolved = _resolve_symbol(symbol)
+
     # Create ticker object
-    ticker = yf.Ticker(symbol.upper())
+    ticker = yf.Ticker(resolved)
 
     # Fetch historical data for the specified date range
     data = yf_retry(lambda: ticker.history(start=start_date, end=end_date))
@@ -251,7 +309,7 @@ def get_fundamentals(
 ):
     """Get company fundamentals overview from yfinance."""
     try:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(_resolve_symbol(ticker))
         info = yf_retry(lambda: ticker_obj.info)
 
         if not info:
@@ -309,7 +367,7 @@ def get_balance_sheet(
 ):
     """Get balance sheet data from yfinance."""
     try:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(_resolve_symbol(ticker))
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_balance_sheet)
@@ -341,7 +399,7 @@ def get_cashflow(
 ):
     """Get cash flow data from yfinance."""
     try:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(_resolve_symbol(ticker))
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_cashflow)
@@ -373,7 +431,7 @@ def get_income_statement(
 ):
     """Get income statement data from yfinance."""
     try:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(_resolve_symbol(ticker))
 
         if freq.lower() == "quarterly":
             data = yf_retry(lambda: ticker_obj.quarterly_income_stmt)
@@ -403,7 +461,7 @@ def get_insider_transactions(
 ):
     """Get insider transactions data from yfinance."""
     try:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(_resolve_symbol(ticker))
         data = yf_retry(lambda: ticker_obj.insider_transactions)
         
         if data is None or data.empty:

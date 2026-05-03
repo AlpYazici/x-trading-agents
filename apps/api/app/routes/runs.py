@@ -47,10 +47,15 @@ async def stream_events(run_id: int):
     queue = await manager.subscribe(run_id)
 
     async def gen():
+        # Initial ping primes the connection so reverse proxies (Cloudflare,
+        # Next.js rewrites) flush the response start immediately instead of
+        # waiting for buffer fill.
+        yield {"event": "ping", "data": "{}"}
         while True:
             try:
-                msg = await asyncio.wait_for(queue.get(), timeout=30.0)
+                msg = await asyncio.wait_for(queue.get(), timeout=15.0)
             except asyncio.TimeoutError:
+                # Frequent pings keep proxies awake and prevent idle timeouts.
                 yield {"event": "ping", "data": "{}"}
                 continue
             import json as _j
@@ -59,4 +64,13 @@ async def stream_events(run_id: int):
             if msg["event"] == "done":
                 break
 
-    return EventSourceResponse(gen())
+    # Headers prevent buffering at every layer (Cloudflare, Next.js, browsers):
+    return EventSourceResponse(
+        gen(),
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Content-Encoding": "identity",
+        },
+    )
