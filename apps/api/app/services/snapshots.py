@@ -104,9 +104,9 @@ def get_backfilled_history(days: int = 90, period: str | None = None, interval: 
     if not holdings:
         return []
 
-    # Per-day (date) USD value sum — normalize timezones to date
-    per_date_value: dict[str, float] = {}
-    per_date_count: dict[str, int] = {}  # how many holdings priced this date
+    # Per-bar holdings values — keyed by date_key, holding_id → usd_value
+    # Forward-fill missing bars (different market hours: BIST vs NYSE vs 24/7 crypto)
+    per_bar: dict[str, dict[int, float]] = {}  # date_key -> {holding_id: value_usd}
     fx_today: dict[str, float] = {}
     cost_usd_total = 0.0
 
@@ -168,7 +168,6 @@ def get_backfilled_history(days: int = 90, period: str | None = None, interval: 
             if fx_series is not None:
                 ts_naive = pd.Timestamp(ts).tz_localize(None) if pd.Timestamp(ts).tz is not None else pd.Timestamp(ts)
                 fx_dates = fx_series.index.tz_localize(None) if fx_series.index.tz is not None else fx_series.index
-                # nearest before
                 pos = fx_dates.searchsorted(ts_naive)
                 if pos >= len(fx_series):
                     fx = float(fx_series.iloc[-1])
@@ -180,25 +179,33 @@ def get_backfilled_history(days: int = 90, period: str | None = None, interval: 
                 fx = 1.0
 
             value_usd = h.qty * close * fx
-            per_date_value[date_key] = per_date_value.get(date_key, 0.0) + value_usd
-            per_date_count[date_key] = per_date_count.get(date_key, 0) + 1
+            per_bar.setdefault(date_key, {})[h.id] = value_usd  # type: ignore[arg-type]
 
-    if not per_date_value:
+    if not per_bar:
         return []
 
-    # Only emit dates where ALL holdings have a price (avoid undercounted spikes)
-    expected = len(holdings)
+    # Forward-fill: at each timestamp, if a holding has no bar, use its most
+    # recent known value. Required because BIST/NYSE/crypto have different hours.
+    holding_ids = [h.id for h in holdings]
+    sorted_keys = sorted(per_bar.keys())
+    last_known: dict[int, float] = {}
     series = []
-    for date_key in sorted(per_date_value.keys()):
-        if per_date_count[date_key] < expected:
-            continue  # skip days when one of the markets was closed
-        total = per_date_value[date_key]
+    for date_key in sorted_keys:
+        bar = per_bar[date_key]
+        # update last_known with whatever this bar has
+        for hid in holding_ids:
+            if hid in bar:
+                last_known[hid] = bar[hid]
+        # only emit once we have at least one value for every holding
+        if len(last_known) < len(holding_ids):
+            continue
+        total = sum(last_known.values())
         pl = total - cost_usd_total
         series.append({
             "ts": date_key,
             "total_usd": total,
             "total_pl_usd": pl,
-            "holdings_count": expected,
+            "holdings_count": len(holding_ids),
         })
     return series
 
