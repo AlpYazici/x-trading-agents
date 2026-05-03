@@ -1,5 +1,7 @@
+// Production: use /api (Next.js rewrites in next.config.ts proxy to backend).
+// Development: NEXT_PUBLIC_API_BASE override hits backend directly (e.g. http://127.0.0.1:8001).
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE || "/api";
 
 export async function apiGet<T>(path: string): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
