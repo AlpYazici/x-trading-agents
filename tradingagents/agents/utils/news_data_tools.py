@@ -75,5 +75,14 @@ def get_congress_trades(
         str: Formatted summary of recent Congress trades — buys, sells,
              notable people (Pelosi, etc), and net dollar volume.
     """
+    # Try the live Capitol Trades scraper first (real browser → bypasses CloudFront).
+    # Falls back to S3 stock-watcher feeds if scraper fails.
+    try:
+        from tradingagents.dataflows.capitol_trades_scraper import get_capitol_trades_summary
+        result = get_capitol_trades_summary(ticker)
+        if result and "No recent US Congress trades" not in result:
+            return result
+    except Exception:
+        pass
     from tradingagents.dataflows.congress_trades import get_congress_trades_summary
     return get_congress_trades_summary(ticker, days_back=days_back)
