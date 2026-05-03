@@ -223,3 +223,7 @@ apps/*/.env
 apps/*/.env.*
 !apps/*/.env.example
 !apps/*/.env.local.example
+
+# Whitelist Next.js src/lib/ (override Python lib/ rule)
+!apps/web/src/lib/
+!apps/web/src/lib/**
