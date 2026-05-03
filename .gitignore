@@ -217,3 +217,9 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Per-app env files (api, web)
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+!apps/*/.env.local.example

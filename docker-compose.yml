@@ -1,35 +1,45 @@
+# Multi-service deploy for the trading-agents-claude UI + API.
+#
+# SAFETY: ports bind to 127.0.0.1 only by default. Do NOT expose to a LAN
+# without putting auth in front (Caddy + basic auth, Tailscale, etc.).
+#
+# Live trading requires ALPACA_LIVE=true in .env AND a fresh review of the
+# risk limits (RISK_*). Default mode is paper.
+
 services:
-  tradingagents:
-    build: .
-    env_file:
-      - .env
-    volumes:
-      - tradingagents_data:/home/appuser/.tradingagents
-    tty: true
-    stdin_open: true
-
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    profiles:
-      - ollama
-
-  tradingagents-ollama:
-    build: .
-    env_file:
-      - .env
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
     environment:
-      - LLM_PROVIDER=ollama
+      - DB_PATH=/data/api.db
+      - TRADINGAGENTS_RESULTS_DIR=/data/logs
+      - TRADINGAGENTS_CACHE_DIR=/data/cache
+      - TRADINGAGENTS_MEMORY_LOG_PATH=/data/memory/trading_memory.md
+      - CORS_ORIGINS=http://localhost:3000
     volumes:
-      - tradingagents_data:/home/appuser/.tradingagents
+      - api_data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+    ports:
+      - "127.0.0.1:3000:3000"
     depends_on:
-      - ollama
-    tty: true
-    stdin_open: true
-    profiles:
-      - ollama
+      - api
+    restart: unless-stopped
 
 volumes:
-  tradingagents_data:
-  ollama_data:
+  api_data:
