@@ -56,6 +56,19 @@ class _Manager:
         handle.task = loop.create_task(self._execute(handle))
         return run_id
 
+    async def resume(self, run_id: int, ticker: str, trade_date: str) -> None:
+        """Re-launch a worker for an existing 'running' DB row (post-restart).
+
+        Relies on TradingAgents' LangGraph SqliteSaver checkpoint — the graph
+        will skip nodes already completed and pick up where it left off.
+        """
+        if run_id in self._runs and not self._runs[run_id].done:
+            return  # already running
+        handle = _RunHandle(run_id=run_id, ticker=ticker.upper(), trade_date=trade_date)
+        self._runs[run_id] = handle
+        loop = asyncio.get_running_loop()
+        handle.task = loop.create_task(self._execute(handle))
+
     async def subscribe(self, run_id: int) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=512)
 

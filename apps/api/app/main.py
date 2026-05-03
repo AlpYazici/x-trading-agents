@@ -43,19 +43,59 @@ def _startup() -> None:
         os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
 
     # Recover from crashes: any run still marked "running" is orphaned (worker died).
+    # If a checkpoint exists for it, AUTO-RESUME by relaunching the worker.
+    # Otherwise mark as failed.
     from datetime import datetime
+    from pathlib import Path
     from sqlmodel import Session, select
     from .db import Run, engine
+    from .services.run_manager import manager
+    from tradingagents.default_config import DEFAULT_CONFIG
+    import asyncio
+    import logging
+
+    log = logging.getLogger(__name__)
+
+    cache_dir = DEFAULT_CONFIG.get("data_cache_dir") or str(Path.home() / ".tradingagents" / "cache")
+    checkpoints_dir = Path(cache_dir) / "checkpoints"
+
+    def _has_checkpoint(ticker: str) -> bool:
+        # LangGraph SqliteSaver stores per-ticker checkpoint files under checkpoints_dir
+        if not checkpoints_dir.exists():
+            return False
+        for f in checkpoints_dir.iterdir():
+            if ticker.lower() in f.name.lower():
+                return True
+        return False
 
     with Session(engine) as s:
         orphans = s.exec(select(Run).where(Run.status == "running")).all()  # type: ignore[arg-type]
+        to_resume: list[tuple[int, str, str]] = []
         for r in orphans:
-            r.status = "failed"
-            r.error = "API restarted before run completed; worker lost"
-            r.finished_at = datetime.utcnow()
-            s.add(r)
+            if _has_checkpoint(r.ticker):
+                # Keep status running, will resume below
+                log.info("auto-resume queued for run #%s %s (%s)", r.id, r.ticker, r.trade_date)
+                to_resume.append((r.id, r.ticker, r.trade_date))
+            else:
+                r.status = "failed"
+                r.error = "API restarted before run completed; no checkpoint found"
+                r.finished_at = datetime.utcnow()
+                s.add(r)
         if orphans:
             s.commit()
+
+    # Schedule auto-resume tasks AFTER the event loop is running
+    if to_resume:
+        async def _resume_all():
+            await asyncio.sleep(2)  # let app finish startup
+            for run_id, ticker, trade_date in to_resume:
+                try:
+                    await manager.resume(run_id, ticker, trade_date)
+                    log.info("resumed run #%s %s", run_id, ticker)
+                except Exception:
+                    log.exception("resume failed for run #%s", run_id)
+        loop = asyncio.get_event_loop()
+        loop.create_task(_resume_all())
 
     # Cron-driven batch scans (re-registers all enabled Schedule rows).
     scheduler.start_scheduler()
