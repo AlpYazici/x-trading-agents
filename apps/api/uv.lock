@@ -2453,6 +2453,23 @@ wheels = [
 ]
 
 [[package]]
+name = "scrapling"
+version = "0.4.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cssselect" },
+    { name = "lxml" },
+    { name = "orjson" },
+    { name = "tld" },
+    { name = "typing-extensions" },
+    { name = "w3lib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/3e/bfaf7f92f880c4800ed9f4ec08a2e8bf65dcb44bb943c4f982b76e0f498e/scrapling-0.4.7.tar.gz", hash = "sha256:60b4ad1a323bd9dd884c372ad4c5062e38bf90ae96c189f77f95ea9fda5918e3", size = 141672, upload-time = "2026-04-17T21:10:24.611Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/2e/dd36b1d9e8bdd41879dd00459d3dee0dc82896d05888fda4028f89713a59/scrapling-0.4.7-py3-none-any.whl", hash = "sha256:779307f34bbebbb252605316749d8a105cf82e7a28ecc833c02cfd86dad77b7a", size = 150711, upload-time = "2026-04-17T21:10:22.843Z" },
+]
+
+[[package]]
 name = "setuptools"
 version = "82.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2687,6 +2704,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tld"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/5d/76b4383ac4e5b5e254e50c09807b3e13820bed6d6c11cd540264988d6802/tld-0.13.2.tar.gz", hash = "sha256:d983fa92b9d717400742fca844e29d5e18271079c7bcfabf66d01b39b4a14345", size = 467175, upload-time = "2026-03-06T23:50:34.498Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/90/39a85a4b63c84213e78b3c17d22e1bf45328acf8ebb33ef93be30d0a3911/tld-0.13.2-py2.py3-none-any.whl", hash = "sha256:9b8fdbdb880e7ba65b216a4937f2c94c49a7226723783d5838fc958ac76f4e0c", size = 296743, upload-time = "2026-03-06T23:50:32.465Z" },
+]
+
+[[package]]
 name = "tqdm"
 version = "4.67.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2711,6 +2737,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "scrapling" },
     { name = "sqlmodel" },
     { name = "sse-starlette" },
     { name = "tradingagents" },
@@ -2727,6 +2754,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "scrapling", specifier = ">=0.2" },
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "sse-starlette", specifier = ">=2.1.3" },
     { name = "tradingagents", editable = "../../" },

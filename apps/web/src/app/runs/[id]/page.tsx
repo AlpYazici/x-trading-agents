@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useRef } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Brain,
@@ -293,6 +293,7 @@ function pct(n: number | null | undefined): string {
 }
 
 function EventRow({ event, data }: { event: string; data: unknown }) {
+  const [expanded, setExpanded] = useState<boolean>(false);
   if (event === "ping" || event === "chain_start") return null;
 
   const meta: Record<
@@ -319,10 +320,14 @@ function EventRow({ event, data }: { event: string; data: unknown }) {
       (d.input as string) ??
       (d.model as string) ??
       (d.message as string) ??
-      JSON.stringify(d).slice(0, 400);
+      JSON.stringify(d, null, 2);
   } else {
     preview = String(data);
   }
+
+  const PREVIEW_LIMIT = 1500;
+  const isLong = preview.length > PREVIEW_LIMIT;
+  const shown = expanded || !isLong ? preview : preview.slice(0, PREVIEW_LIMIT);
 
   return (
     <div className="slide-in flex gap-3 rounded-xl border bg-card/50 p-3">
@@ -330,13 +335,29 @@ function EventRow({ event, data }: { event: string; data: unknown }) {
         <m.Icon className={`h-3.5 w-3.5 ${m.color}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className={`text-[11px] font-medium uppercase tracking-wider ${m.color}`}>
-          {m.label}
+        <div className="flex items-center justify-between gap-2">
+          <div className={`text-[11px] font-medium uppercase tracking-wider ${m.color}`}>
+            {m.label}
+          </div>
+          {isLong && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-md border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {expanded ? "Collapse" : `Expand (${(preview.length / 1000).toFixed(1)}KB)`}
+            </button>
+          )}
         </div>
-        <div className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground/80">
-          {preview.slice(0, 1500)}
-          {preview.length > 1500 && (
-            <span className="text-muted-foreground"> ... +{preview.length - 1500} chars</span>
+        <div
+          className={`mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground/80 ${
+            expanded ? "max-h-[60vh] overflow-y-auto" : ""
+          }`}
+        >
+          {shown}
+          {isLong && !expanded && (
+            <span className="text-muted-foreground">
+              {" "}... +{((preview.length - PREVIEW_LIMIT) / 1000).toFixed(1)}KB
+            </span>
           )}
         </div>
       </div>

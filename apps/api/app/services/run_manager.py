@@ -204,13 +204,13 @@ class _StreamingCallback(BaseCallbackHandler):
             text = response.generations[0][0].text or ""
         except Exception:
             text = ""
-        self._emit("llm_end", {"text": text[:8000]})
+        self._emit("llm_end", {"text": text[:200_000]})  # full agent reports
 
     def on_tool_start(self, serialized, input_str, **kw):  # noqa: ANN001
-        self._emit("tool_start", {"tool": (serialized or {}).get("name", ""), "input": input_str[:2000]})
+        self._emit("tool_start", {"tool": (serialized or {}).get("name", ""), "input": input_str[:50_000]})
 
     def on_tool_end(self, output, **kw):  # noqa: ANN001
-        self._emit("tool_end", {"output": str(output)[:4000]})
+        self._emit("tool_end", {"output": str(output)[:100_000]})
 
     def on_chain_start(self, serialized, inputs, **kw):  # noqa: ANN001
         name = (serialized or {}).get("name") or (serialized or {}).get("id", [None])[-1] or ""
