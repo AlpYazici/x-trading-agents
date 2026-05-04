@@ -227,3 +227,8 @@ apps/*/.env.*
 # Whitelist Next.js src/lib/ (override Python lib/ rule)
 !apps/web/src/lib/
 !apps/web/src/lib/**
+
+# Personal project context — never push
+CLAUDE.md
+.claude/
+.cursorrules
