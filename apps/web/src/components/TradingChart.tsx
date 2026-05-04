@@ -2,14 +2,21 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
-import { init, dispose, CandleType, type Chart, type KLineData } from "klinecharts";
+import {
+  init,
+  dispose,
+  registerOverlay,
+  CandleType,
+  type Chart,
+  type KLineData,
+  type OverlayTemplate,
+} from "klinecharts";
 import {
   Minus,
   TrendingUp,
   Square,
   Ruler,
   Type as TypeIcon,
-  Trash2,
   Eraser,
   ArrowUpDown,
   Activity,
@@ -52,16 +59,139 @@ function detectExchange(sym: string, fallback: string): string {
   return fallback;
 }
 
-// Tools available in klinecharts overlay set. Names match library conventions.
+// klinecharts ships fibonacci/segment/horizontal/etc out of the box but does
+// NOT include rectangle or measure. Both are registered below as custom
+// overlays so the toolbar can offer them.
 const DRAW_TOOLS: { name: string; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { name: "horizontalRayLine", label: "Horizontal", Icon: Minus },
   { name: "segment",           label: "Trend line", Icon: TrendingUp },
-  { name: "rect",              label: "Rectangle", Icon: Square },
-  { name: "fibonacciLine",     label: "Fibonacci", Icon: ArrowUpDown },
-  { name: "priceChannelLine",  label: "Channel",   Icon: Activity },
-  { name: "priceLine",         label: "Measure",   Icon: Ruler },
-  { name: "simpleAnnotation",  label: "Note",      Icon: TypeIcon },
+  { name: "rectangle",         label: "Rectangle",  Icon: Square },
+  { name: "fibonacciLine",     label: "Fibonacci",  Icon: ArrowUpDown },
+  { name: "priceChannelLine",  label: "Channel",    Icon: Activity },
+  { name: "measure",           label: "Measure",    Icon: Ruler },
+  { name: "simpleAnnotation",  label: "Note",       Icon: TypeIcon },
 ];
+
+// One-time global registration. Module-level guard so HMR / multiple chart
+// instances don't try to register twice (which would throw).
+let _customOverlaysRegistered = false;
+function ensureCustomOverlays() {
+  if (_customOverlaysRegistered) return;
+  _customOverlaysRegistered = true;
+
+  const rectangle: OverlayTemplate = {
+    name: "rectangle",
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    createPointFigures: ({ coordinates }) => {
+      if (coordinates.length < 2) return [];
+      const [a, b] = coordinates;
+      return [
+        {
+          type: "polygon",
+          attrs: {
+            coordinates: [
+              { x: a.x, y: a.y },
+              { x: b.x, y: a.y },
+              { x: b.x, y: b.y },
+              { x: a.x, y: b.y },
+            ],
+          },
+          styles: {
+            style: "stroke_fill",
+            color: "rgba(139,92,246,0.18)",
+            borderColor: "#8b5cf6",
+            borderSize: 2,
+          },
+        },
+      ];
+    },
+  };
+
+  // Measure: rectangle + a label showing price delta, % change, and bar count
+  // between the two anchor points (TradingView's price-range tool behavior).
+  const measure: OverlayTemplate = {
+    name: "measure",
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: false,
+    needDefaultYAxisFigure: false,
+    createPointFigures: ({ coordinates, overlay, bounding }) => {
+      if (coordinates.length < 2) return [];
+      const [a, b] = coordinates;
+      const points = overlay.points ?? [];
+      if (points.length < 2) return [];
+
+      const p0 = points[0];
+      const p1 = points[1];
+      const v0 = p0.value ?? 0;
+      const v1 = p1.value ?? 0;
+      const delta = v1 - v0;
+      const pct = v0 ? (delta / v0) * 100 : 0;
+      const bars = Math.abs((p1.dataIndex ?? 0) - (p0.dataIndex ?? 0));
+
+      const up = delta >= 0;
+      const fill = up ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)";
+      const border = up ? "#10b981" : "#ef4444";
+
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+
+      const sign = up ? "+" : "";
+      const label =
+        `${sign}${delta.toFixed(2)}  (${sign}${pct.toFixed(2)}%)\n` +
+        `${bars} bars`;
+
+      // Clamp label inside chart bounds so it never paints offscreen.
+      const labelX = Math.max(20, Math.min(midX, (bounding?.width ?? midX + 100) - 20));
+      const labelY = Math.max(20, Math.min(midY, (bounding?.height ?? midY + 100) - 20));
+
+      return [
+        {
+          type: "polygon",
+          attrs: {
+            coordinates: [
+              { x: a.x, y: a.y },
+              { x: b.x, y: a.y },
+              { x: b.x, y: b.y },
+              { x: a.x, y: b.y },
+            ],
+          },
+          styles: { style: "stroke_fill", color: fill, borderColor: border, borderSize: 1 },
+        },
+        {
+          type: "text",
+          attrs: {
+            x: labelX,
+            y: labelY,
+            text: label,
+            align: "center",
+            baseline: "middle",
+          },
+          styles: {
+            color: "#fff",
+            backgroundColor: border,
+            size: 11,
+            paddingLeft: 8,
+            paddingRight: 8,
+            paddingTop: 6,
+            paddingBottom: 6,
+            borderRadius: 6,
+            family: "ui-sans-serif, system-ui",
+            weight: "600",
+          },
+        },
+      ];
+    },
+  };
+
+  registerOverlay(rectangle);
+  registerOverlay(measure);
+}
+
+ensureCustomOverlays();
 
 const INDICATORS: { name: string; label: string; pane: "main" | "sub" }[] = [
   { name: "MA",   label: "MA",   pane: "main" },
