@@ -159,27 +159,33 @@ function SortableMarketTile(props: {
     zIndex: isDragging ? 50 : "auto",
   };
   return (
-    <div ref={setNodeRef} style={style}>
-      <MarketTile {...props} dragHandle={{ attributes, listeners }} />
+    <div ref={setNodeRef} style={style} className="group/sortable relative">
+      {/* Drag handle is a SIBLING of the Link, not nested — Next.js Link
+          swallows pointer events otherwise and dnd-kit never activates. */}
+      <button
+        {...attributes}
+        {...listeners}
+        type="button"
+        aria-label="Drag to reorder"
+        className="absolute left-1.5 top-1.5 z-20 cursor-grab touch-none rounded-md bg-card/70 p-1 text-muted-foreground opacity-0 backdrop-blur transition hover:bg-accent hover:text-foreground active:cursor-grabbing group-hover/sortable:opacity-100"
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+      <MarketTile {...props} hasDragHandle />
     </div>
   );
 }
-
-type DragHandle = {
-  attributes: ReturnType<typeof useSortable>["attributes"];
-  listeners: ReturnType<typeof useSortable>["listeners"];
-};
 
 function MarketTile({
   def,
   quote,
   onRemove,
-  dragHandle,
+  hasDragHandle = false,
 }: {
   def: MarketDef;
   quote: Quote | undefined;
   onRemove: () => void;
-  dragHandle?: DragHandle;
+  hasDragHandle?: boolean;
 }) {
   const last = quote?.last ?? null;
   const pct = quote?.change_pct ?? null;
@@ -200,21 +206,6 @@ function MarketTile({
       href={href}
       className="group relative block rounded-xl border bg-card/40 p-3 transition hover:border-primary/40 hover:bg-card hover:shadow-md"
     >
-      {dragHandle && (
-        <button
-          {...dragHandle.attributes}
-          {...dragHandle.listeners}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          className="absolute left-1.5 top-1.5 z-10 cursor-grab rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground active:cursor-grabbing group-hover:opacity-100"
-          aria-label="Drag to reorder"
-          type="button"
-        >
-          <GripVertical className="h-3 w-3" />
-        </button>
-      )}
       <button
         onClick={handleRemove}
         className="absolute right-1.5 top-1.5 z-10 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
@@ -222,7 +213,7 @@ function MarketTile({
       >
         <X className="h-3 w-3" />
       </button>
-      <div className={`flex items-start justify-between gap-2 pr-4 ${dragHandle ? "pl-3" : ""}`}>
+      <div className={`flex items-start justify-between gap-2 pr-4 ${hasDragHandle ? "pl-5" : ""}`}>
         <div className="min-w-0">
           <div className="truncate text-xs font-medium text-muted-foreground group-hover:text-foreground">
             {def.label}
