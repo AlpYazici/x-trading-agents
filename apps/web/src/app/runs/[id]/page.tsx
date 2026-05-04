@@ -12,8 +12,17 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Maximize2,
+  Copy,
 } from "lucide-react";
 import { apiGet, apiPost, type Run, type Order } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type BacktestResult = {
   verified: boolean;
@@ -340,17 +349,46 @@ function EventRow({ event, data }: { event: string; data: unknown }) {
             {m.label}
           </div>
           {isLong && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="rounded-md border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              {expanded ? "Collapse" : `Expand (${(preview.length / 1000).toFixed(1)}KB)`}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="rounded-md border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {expanded ? "Collapse" : `Expand (${(preview.length / 1000).toFixed(1)}KB)`}
+              </button>
+              <Dialog>
+                <DialogTrigger
+                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title="Open full text"
+                >
+                  <Maximize2 className="h-3 w-3" />
+                  Full
+                </DialogTrigger>
+                <DialogContent className="!max-w-[min(1100px,95vw)] !w-[min(1100px,95vw)] !max-h-[92vh] !h-[92vh] flex flex-col p-0">
+                  <DialogHeader className="border-b px-4 py-3 flex-row items-center justify-between gap-2">
+                    <DialogTitle className="text-sm">
+                      {m.label} — {(preview.length / 1000).toFixed(1)}KB
+                    </DialogTitle>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(preview)}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      <Copy className="h-3 w-3" /> Copy
+                    </button>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto px-4 py-3">
+                    <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground/90">
+                      {preview}
+                    </pre>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
         <div
           className={`mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground/80 ${
-            expanded ? "max-h-[60vh] overflow-y-auto" : ""
+            expanded ? "max-h-[80vh] overflow-y-auto pr-2" : ""
           }`}
         >
           {shown}

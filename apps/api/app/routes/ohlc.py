@@ -1,3 +1,5 @@
+from time import time
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 import yfinance as yf
@@ -6,6 +8,13 @@ from ..services.holdings import yf_symbol
 from tradingagents.dataflows.y_finance import _resolve_symbol
 
 router = APIRouter(prefix="/ohlc", tags=["ohlc"])
+
+# In-memory TTL cache. The dashboard fires 15+ /quote requests in parallel on
+# every page load; without caching yfinance rate-limits and tiles go blank.
+_quote_cache: dict[str, tuple["Quote", float]] = {}
+_QUOTE_TTL = 60.0  # seconds — quote refresh interval matches client refetch
+_ohlc_cache: dict[tuple[str, str, str], tuple[list, float]] = {}
+_OHLC_TTL = 60.0
 
 
 def _resolve_yf(symbol: str, exchange: str) -> str:
@@ -49,11 +58,22 @@ def get_quote(
 ):
     """Light-weight quote: last price + 1d change + tiny sparkline."""
     yf_sym = _resolve_yf(symbol, exchange)
+    now = time()
+    cached = _quote_cache.get(yf_sym)
+    if cached and now - cached[1] < _QUOTE_TTL:
+        return cached[0]
+
     try:
         h = yf.Ticker(yf_sym).history(period="5d", interval="1d")
-    except Exception as e:
-        raise HTTPException(502, f"yfinance error for {yf_sym}: {e}")
+    except Exception:
+        # On transient yfinance failure, return stale cache rather than nothing.
+        if cached:
+            return cached[0]
+        return Quote(symbol=yf_sym, last=None, prev_close=None, change=None, change_pct=None)
+
     if len(h) == 0:
+        if cached:
+            return cached[0]
         return Quote(symbol=yf_sym, last=None, prev_close=None, change=None, change_pct=None)
 
     closes = [float(c) for c in h["Close"].tolist()]
@@ -61,7 +81,7 @@ def get_quote(
     prev = closes[-2] if len(closes) >= 2 else None
     change = (last - prev) if prev is not None else None
     change_pct = (change / prev) if (change is not None and prev) else None
-    return Quote(
+    q = Quote(
         symbol=yf_sym,
         last=last,
         prev_close=prev,
@@ -69,6 +89,8 @@ def get_quote(
         change_pct=change_pct,
         sparkline=closes[-30:],
     )
+    _quote_cache[yf_sym] = (q, now)
+    return q
 
 
 @router.get("", response_model=list[Bar])
@@ -84,12 +106,22 @@ def get_ohlc(
         raise HTTPException(400, f"interval must be one of {sorted(_VALID_INTERVALS)}")
 
     yf_sym = _resolve_yf(symbol, exchange)
+    cache_key = (yf_sym, period, interval)
+    now = time()
+    cached = _ohlc_cache.get(cache_key)
+    if cached and now - cached[1] < _OHLC_TTL:
+        return cached[0]
+
     try:
         h = yf.Ticker(yf_sym).history(period=period, interval=interval)
     except Exception as e:
+        if cached:
+            return cached[0]
         raise HTTPException(502, f"yfinance error for {yf_sym}: {e}")
 
     if len(h) == 0:
+        if cached:
+            return cached[0]
         raise HTTPException(404, f"no data for {yf_sym} (period={period}, interval={interval})")
 
     bars: list[Bar] = []
@@ -104,4 +136,5 @@ def get_ohlc(
                 volume=float(row["Volume"]) if "Volume" in row else None,
             )
         )
+    _ohlc_cache[cache_key] = (bars, now)
     return bars
