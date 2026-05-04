@@ -55,7 +55,11 @@ def next_run_for(schedule_id: int) -> Optional[datetime]:
 
 
 async def _fire(schedule_id: int) -> None:
-    """Job body: look up schedule, kick off a run per symbol, update timestamps."""
+    """Job body: look up schedule, kick off a run per symbol, update timestamps.
+
+    Hybrid mode: combines fixed watchlist symbols with screener picks
+    (volume spikes, big moves, near 52w high, etc).
+    """
     with Session(engine) as s:
         row = s.get(Schedule, schedule_id)
         if row is None:
@@ -64,8 +68,22 @@ async def _fire(schedule_id: int) -> None:
             return
         if not row.enabled:
             return
-        symbols = parse_symbols(row.symbols)
+        fixed_symbols = parse_symbols(row.symbols)
         name = row.name
+
+    # Hybrid: fixed watchlist + top screener picks (default 5 extra)
+    from .screener import get_hybrid_symbols
+    try:
+        combined = get_hybrid_symbols(fixed_symbols, top_n_screener=5)
+        symbols = [c["symbol"] for c in combined]
+        sources = {c["symbol"]: c["source"] for c in combined}
+        logger.info("schedule %s hybrid expansion: watchlist=%d screener=%d",
+                    schedule_id, sum(1 for c in combined if c["source"] == "watchlist"),
+                    sum(1 for c in combined if c["source"] == "screener"))
+    except Exception:
+        logger.exception("schedule %s: screener failed, falling back to fixed list", schedule_id)
+        symbols = fixed_symbols
+        sources = {s: "watchlist" for s in symbols}
 
     if not symbols:
         logger.warning("schedule %s (%s) has no symbols; skipping", schedule_id, name)
@@ -78,11 +96,14 @@ async def _fire(schedule_id: int) -> None:
         try:
             await manager.start(sym, td)
             started += 1
+            logger.info("schedule %s: started run for %s (source=%s)",
+                        schedule_id, sym, sources.get(sym, "?"))
         except Exception:
             logger.exception("schedule %s: failed to start run for %s", schedule_id, sym)
             failed.append(sym)
 
-    logger.info("schedule %s (%s) fired: started=%d failed=%s", schedule_id, name, started, failed)
+    logger.info("schedule %s (%s) fired: started=%d failed=%s",
+                schedule_id, name, started, failed)
 
     with Session(engine) as s:
         row = s.get(Schedule, schedule_id)
