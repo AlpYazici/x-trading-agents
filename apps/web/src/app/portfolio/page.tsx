@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LightweightChart } from "@/components/LightweightChart";
+import { TradingChart } from "@/components/TradingChart";
 import { AllocationPie, PnlBars } from "@/components/PortfolioCharts";
 import { AddHoldingDialog } from "@/components/AddHoldingDialog";
 import { PortfolioTimeSeries } from "@/components/PortfolioTimeSeries";
@@ -170,7 +170,7 @@ export default function PortfolioPage() {
           </CardHeader>
           <CardContent>
             {selected ? (
-              <LightweightChart symbol={selected.symbol} exchange={selected.exchange} height={460} />
+              <TradingChart symbol={selected.symbol} exchange={selected.exchange} height={460} />
             ) : (
               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
                 Select a holding on the left

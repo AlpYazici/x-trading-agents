@@ -13,7 +13,7 @@ import { apiGet, apiPost } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LightweightChart } from "@/components/LightweightChart";
+import { TradingChart } from "@/components/TradingChart";
 import { toast } from "sonner";
 
 type Quote = {
@@ -116,7 +116,7 @@ function Inner() {
 
       <Card>
         <CardContent className="p-4">
-          <LightweightChart symbol={symbol} exchange={exchange} height={560} />
+          <TradingChart symbol={symbol} exchange={exchange} height={560} />
         </CardContent>
       </Card>
 

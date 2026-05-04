@@ -41,7 +41,7 @@ import { useRunStream } from "@/lib/sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LightweightChart } from "@/components/LightweightChart";
+import { TradingChart } from "@/components/TradingChart";
 import { SignalBadge, StatusDot } from "@/components/SignalBadge";
 import { toast } from "sonner";
 
@@ -249,7 +249,7 @@ export default function RunDetailPage(props: { params: Params }) {
               <Card>
                 <CardContent className="p-3">
                   {run?.ticker ? (
-                    <LightweightChart symbol={run.ticker} exchange="US" height={560} />
+                    <TradingChart symbol={run.ticker} exchange="US" height={560} />
                   ) : (
                     <div className="py-16 text-center text-sm text-muted-foreground">Loading...</div>
                   )}

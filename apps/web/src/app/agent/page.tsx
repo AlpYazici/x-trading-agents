@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LightweightChart } from "@/components/LightweightChart";
+import { TradingChart } from "@/components/TradingChart";
 import { SignalBadge, StatusDot } from "@/components/SignalBadge";
 import { toast } from "sonner";
 
@@ -211,7 +211,7 @@ export default function AgentPage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <LightweightChart symbol={selected} exchange="US" height={420} />
+                <TradingChart symbol={selected} exchange="US" height={420} />
               </CardContent>
             </Card>
           ) : (
