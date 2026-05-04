@@ -127,63 +127,83 @@ export function CompanyProfile({
     return null;
   }
 
+  // Crypto / index / commodity / FX symbols don't have meaningful company
+  // ratios — yfinance .info returns just a name. Hide the financial panels
+  // entirely and show only a slim header.
+  const isCompany = profile.market_cap != null && profile.sector != null;
+
   return (
     <div className="space-y-4">
       <CompanyHeader profile={profile} />
-      <KeyRatios profile={profile} />
-      <FinancialsCharts financials={financials} loading={fLoading} />
-      <AnalystAndPriceRefs profile={profile} />
+      {isCompany && (
+        <>
+          <KeyRatios profile={profile} />
+          <FinancialsCharts financials={financials} loading={fLoading} />
+          <AnalystAndPriceRefs profile={profile} />
+        </>
+      )}
     </div>
   );
 }
 
 function CompanyHeader({ profile }: { profile: Profile }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <Card>
-      <CardContent className="space-y-3 p-5">
+      <CardContent className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Building2 className="h-3.5 w-3.5" />
-              {profile.sector ?? "—"}
-              {profile.industry && (
-                <>
-                  <span>·</span>
-                  <span>{profile.industry}</span>
-                </>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              {profile.sector && (
+                <span className="inline-flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {profile.sector}
+                </span>
               )}
+              {profile.industry && <span>· {profile.industry}</span>}
               {profile.country && (
-                <>
-                  <span>·</span>
-                  <Globe className="h-3 w-3" />
-                  <span>{profile.country}</span>
-                </>
+                <span className="inline-flex items-center gap-1">
+                  · <Globe className="h-3 w-3" /> {profile.country}
+                </span>
+              )}
+              {profile.employees != null && (
+                <span className="inline-flex items-center gap-1">
+                  · <Users className="h-3 w-3" /> {profile.employees.toLocaleString("en-US")}
+                </span>
               )}
             </div>
-            <div className="mt-1 text-lg font-semibold">{profile.name}</div>
-            {profile.employees != null && (
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="h-3 w-3" />
-                {profile.employees.toLocaleString("en-US")} employees
-              </div>
-            )}
+            <div className="mt-1 text-base font-semibold">{profile.name}</div>
           </div>
           {profile.website && (
             <a
               href={profile.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
             >
-              Website
+              Site
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
         {profile.summary && (
-          <p className="line-clamp-4 text-xs leading-relaxed text-foreground/75">
-            {profile.summary}
-          </p>
+          <div>
+            <p
+              className={`text-xs leading-relaxed text-foreground/70 ${
+                expanded ? "" : "line-clamp-2"
+              }`}
+            >
+              {profile.summary}
+            </p>
+            {profile.summary.length > 220 && (
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="mt-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                {expanded ? "Show less" : "Show more"}
+              </button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
@@ -343,10 +363,16 @@ function BarSeries({
   color: string;
   data: { date: string; value: number }[];
 }) {
-  const max = Math.max(...data.map((d) => Math.abs(d.value)));
-  const last = data[data.length - 1].value;
-  const prev = data.length >= 2 ? data[data.length - 2].value : null;
-  const yoyData = data.length >= 5 ? data[data.length - 5].value : null;
+  const values = data.map((d) => d.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  // Min-max scale with 10% padding so smallest bar is still ~10% tall — keeps
+  // visual contrast for series like revenue where all points are huge
+  // numbers within a tight band (e.g. 90B–113B looks flat at 0-baseline).
+  const span = max - min || max || 1;
+  const last = values[values.length - 1];
+  const prev = values.length >= 2 ? values[values.length - 2] : null;
+  const yoyData = values.length >= 5 ? values[values.length - 5] : null;
   const qoq = prev ? (last - prev) / Math.abs(prev) : null;
   const yoy = yoyData ? (last - yoyData) / Math.abs(yoyData) : null;
 
@@ -368,41 +394,47 @@ function BarSeries({
             </span>
           )}
           {yoy != null && (
-            <span className={yoy >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
+            <span className={`rounded-md px-1.5 py-0.5 font-semibold ${yoy >= 0 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>
               YoY {yoy >= 0 ? "+" : ""}{(yoy * 100).toFixed(1)}%
             </span>
           )}
         </div>
       </div>
-      <div className="flex items-end gap-1.5" style={{ height: 80 }}>
+      <div className="flex items-end gap-1.5" style={{ height: 110 }}>
         {data.map((d, i) => {
-          const h = max ? (Math.abs(d.value) / max) * 100 : 0;
+          // 12-100% scaled so smallest bar is visible.
+          const norm = (d.value - min) / span;
+          const h = 12 + norm * 88;
           const negative = d.value < 0;
+          const isLast = i === data.length - 1;
           return (
             <div
               key={d.date + i}
               className="group relative flex flex-1 flex-col items-center justify-end"
               title={`${d.date}: ${bigFmt(d.value, "USD")}`}
             >
+              <span className="mb-0.5 text-[9px] font-medium tabular-nums text-foreground/80">
+                {bigFmt(d.value, "USD")}
+              </span>
               <div
-                className="w-full rounded-t transition group-hover:opacity-80"
+                className="w-full rounded-t"
                 style={{
                   height: `${h}%`,
                   backgroundColor: negative ? "#ef4444" : color,
-                  opacity: 0.85,
-                  minHeight: 2,
+                  opacity: isLast ? 1 : 0.7,
+                  minHeight: 4,
                 }}
               />
-              <div className="mt-1 hidden text-[9px] text-muted-foreground group-hover:block">
-                {d.date.slice(2, 7)}
-              </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-1 flex justify-between text-[9px] text-muted-foreground">
-        <span>{data[0].date}</span>
-        <span>{data[data.length - 1].date}</span>
+      <div className="mt-1 flex gap-1.5">
+        {data.map((d, i) => (
+          <div key={d.date + "lbl" + i} className="flex-1 truncate text-center text-[9px] text-muted-foreground">
+            {d.date.slice(2, 7).replace("-", "/")}
+          </div>
+        ))}
       </div>
     </div>
   );

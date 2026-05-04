@@ -35,13 +35,15 @@ type Bar = {
 
 type Range = { period: string; interval: string };
 const RANGES: { label: string; r: Range }[] = [
-  { label: "1D", r: { period: "1d", interval: "5m" } },
-  { label: "5D", r: { period: "5d", interval: "15m" } },
-  { label: "1M", r: { period: "1mo", interval: "1h" } },
-  { label: "3M", r: { period: "3mo", interval: "1d" } },
-  { label: "6M", r: { period: "6mo", interval: "1d" } },
-  { label: "1Y", r: { period: "1y", interval: "1d" } },
-  { label: "5Y", r: { period: "5y", interval: "1wk" } },
+  { label: "15m", r: { period: "1d",  interval: "15m" } },  // 1 day @ 15min
+  { label: "1H",  r: { period: "5d",  interval: "1h"  } },  // 5 days @ 1h
+  { label: "1D",  r: { period: "1d",  interval: "5m"  } },
+  { label: "5D",  r: { period: "5d",  interval: "15m" } },
+  { label: "1M",  r: { period: "1mo", interval: "1h"  } },
+  { label: "3M",  r: { period: "3mo", interval: "1d"  } },
+  { label: "6M",  r: { period: "6mo", interval: "1d"  } },
+  { label: "1Y",  r: { period: "1y",  interval: "1d"  } },
+  { label: "5Y",  r: { period: "5y",  interval: "1wk" } },
 ];
 
 type ChartType = "candle" | "area";
@@ -58,6 +60,35 @@ function detectExchange(sym: string, fallback: string): string {
   ]);
   if (cryptoBases.has(s)) return "CRYPTO";
   return fallback;
+}
+
+// Bars-back lookups for the % change shown next to each range pill.
+// Daily series, so 15m/1H show no % (intraday — different scale).
+const RANGE_BARS_BACK: Record<string, number | null> = {
+  "15m": null,
+  "1H": null,
+  "1D": 1,
+  "5D": 5,
+  "1M": 21,
+  "3M": 63,
+  "6M": 126,
+  "1Y": 252,
+  "5Y": 1260,
+};
+
+function computeRangeChanges(series: Bar[] | undefined): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  if (!series || series.length === 0) return out;
+  const last = series[series.length - 1].close;
+  for (const [label, n] of Object.entries(RANGE_BARS_BACK)) {
+    if (n == null || series.length <= n) {
+      out[label] = null;
+      continue;
+    }
+    const prev = series[series.length - 1 - n].close;
+    out[label] = prev ? (last - prev) / prev : null;
+  }
+  return out;
 }
 
 // klinecharts ships fibonacci/segment/horizontal/etc out of the box but does
@@ -311,6 +342,19 @@ export function TradingChart({
     staleTime: 20_000,
   });
 
+  // Separate 5y-daily query feeds the % change shown next to each range pill
+  // (Apple Stocks / Yahoo style). Fetched once, cached aggressively.
+  const { data: longSeries } = useQuery({
+    queryKey: ["ohlc-5y-daily", symbol, effectiveExchange],
+    queryFn: () =>
+      apiGet<Bar[]>(
+        `/ohlc?symbol=${encodeURIComponent(symbol)}&exchange=${effectiveExchange}&period=5y&interval=1d`
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+  const rangeChangePcts = computeRangeChanges(longSeries);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const containerId = useRef(
@@ -394,15 +438,30 @@ export function TradingChart({
       {/* Range + chart-type toggles */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/30 p-0.5">
-          {RANGES.map((opt, i) => (
-            <Pill
-              key={opt.label}
-              active={rangeIdx === i}
-              onClick={() => setRangeIdx(i)}
-            >
-              {opt.label}
-            </Pill>
-          ))}
+          {RANGES.map((opt, i) => {
+            const pct = rangeChangePcts[opt.label];
+            return (
+              <Pill
+                key={opt.label}
+                active={rangeIdx === i}
+                onClick={() => setRangeIdx(i)}
+              >
+                <div className="flex flex-col items-center leading-tight">
+                  <span>{opt.label}</span>
+                  {pct != null && (
+                    <span
+                      className={`text-[9px] font-normal tabular-nums ${
+                        pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {pct >= 0 ? "+" : ""}
+                      {(pct * 100).toFixed(2)}%
+                    </span>
+                  )}
+                </div>
+              </Pill>
+            );
+          })}
         </div>
         <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-0.5">
           {(["candle", "area"] as const).map((t) => (
