@@ -1,8 +1,27 @@
 """News, earnings, sector performance — markets context endpoints."""
 from fastapi import APIRouter, Query
 from ..services import news as news_svc
+from ..services import company as company_svc
 
 router = APIRouter(prefix="/markets", tags=["markets"])
+
+
+@router.get("/profile")
+def get_profile(symbol: str = Query(..., min_length=1), exchange: str = "US"):
+    """Company info + ratios (P/E, margins, ROE, dividend, analyst targets, etc).
+
+    Cached 1h server-side. Powers the company detail panel on /chart.
+    """
+    return company_svc.get_profile(symbol, exchange)
+
+
+@router.get("/financials")
+def get_financials(symbol: str = Query(..., min_length=1), exchange: str = "US"):
+    """Annual + quarterly revenue / gross profit / operating income / net income / EBITDA / EPS.
+
+    Cached 12h. Frontend renders historical bar charts.
+    """
+    return company_svc.get_financials(symbol, exchange)
 
 
 @router.get("/news")

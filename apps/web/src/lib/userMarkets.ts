@@ -117,7 +117,18 @@ export function useMarketGroup(group: GroupKey) {
     persist(DEFAULTS[group]);
   }, [group, persist]);
 
-  return { list, add, remove, reset };
+  const reorder = useCallback(
+    (fromIdx: number, toIdx: number) => {
+      if (fromIdx === toIdx) return;
+      const next = [...list];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      persist(next);
+    },
+    [list, persist]
+  );
+
+  return { list, add, remove, reset, reorder };
 }
 
 /** Auto-classify a symbol into a group based on common patterns. */

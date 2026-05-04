@@ -10,10 +10,11 @@ import {
   Brain,
 } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TradingChart } from "@/components/TradingChart";
+import { CompanyProfile } from "@/components/CompanyProfile";
 import { toast } from "sonner";
 
 type Quote = {
@@ -120,71 +121,7 @@ function Inner() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Recent closes (5d)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-5 gap-2">
-              {(quote?.sparkline ?? []).slice(-5).map((c, i) => (
-                <div key={i} className="rounded-lg border bg-card/50 p-3">
-                  <div className="text-[10px] text-muted-foreground">
-                    {i === 4 ? "today" : `${4 - i}d ago`}
-                  </div>
-                  <div className="mt-1 font-mono text-sm font-semibold">{fmt(c)}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Quick info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <Row label="Symbol" value={symbol} />
-              <Row label="Exchange" value={exchange} />
-              <Row label="Last" value={last != null ? fmt(last) : "—"} />
-              <Row label="Prev close" value={quote?.prev_close != null ? fmt(quote.prev_close) : "—"} />
-              <Row
-                label="Change"
-                value={
-                  quote?.change != null
-                    ? `${quote.change >= 0 ? "+" : ""}${fmt(quote.change)} (${(quote.change_pct! * 100).toFixed(2)}%)`
-                    : "—"
-                }
-                tone={(quote?.change ?? 0) >= 0 ? "emerald" : "red"}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "emerald" | "red";
-}) {
-  const cls =
-    tone === "emerald"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "red"
-        ? "text-red-600 dark:text-red-400"
-        : "";
-  return (
-    <div className="flex items-center justify-between border-b py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-mono font-medium ${cls}`}>{value}</span>
+      <CompanyProfile symbol={symbol} exchange={exchange} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   Building2,
   Bitcoin,
   X,
+  GripVertical,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
@@ -19,6 +20,20 @@ import {
   type MarketDef,
 } from "@/lib/userMarkets";
 import { AddMarketDialog } from "./AddMarketDialog";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Quote = {
   symbol: string;
@@ -52,7 +67,19 @@ function MarketGroup({
   Icon: React.ComponentType<{ className?: string }>;
   accent: "violet" | "blue" | "emerald" | "amber" | "orange";
 }) {
-  const { list, remove } = useMarketGroup(group);
+  const { list, remove, reorder } = useMarketGroup(group);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = list.findIndex((m) => m.symbol === active.id);
+    const to = list.findIndex((m) => m.symbol === over.id);
+    if (from === -1 || to === -1) return;
+    reorder(from, to);
+  }
   const accents = {
     violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
     blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -98,30 +125,61 @@ function MarketGroup({
             Empty — click "+ Add" above.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-            {list.map((m, i) => (
-              <MarketTile
-                key={m.symbol}
-                def={m}
-                quote={queries[i].data}
-                onRemove={() => remove(m.symbol)}
-              />
-            ))}
-          </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={list.map((m) => m.symbol)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                {list.map((m, i) => (
+                  <SortableMarketTile
+                    key={m.symbol}
+                    def={m}
+                    quote={queries[i].data}
+                    onRemove={() => remove(m.symbol)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </CardContent>
     </Card>
   );
 }
 
+function SortableMarketTile(props: {
+  def: MarketDef;
+  quote: Quote | undefined;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: props.def.symbol });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : "auto",
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <MarketTile {...props} dragHandle={{ attributes, listeners }} />
+    </div>
+  );
+}
+
+type DragHandle = {
+  attributes: ReturnType<typeof useSortable>["attributes"];
+  listeners: ReturnType<typeof useSortable>["listeners"];
+};
+
 function MarketTile({
   def,
   quote,
   onRemove,
+  dragHandle,
 }: {
   def: MarketDef;
   quote: Quote | undefined;
   onRemove: () => void;
+  dragHandle?: DragHandle;
 }) {
   const last = quote?.last ?? null;
   const pct = quote?.change_pct ?? null;
@@ -140,8 +198,23 @@ function MarketTile({
   return (
     <Link
       href={href}
-      className="group relative block rounded-xl border bg-card/40 p-3 transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-md"
+      className="group relative block rounded-xl border bg-card/40 p-3 transition hover:border-primary/40 hover:bg-card hover:shadow-md"
     >
+      {dragHandle && (
+        <button
+          {...dragHandle.attributes}
+          {...dragHandle.listeners}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="absolute left-1.5 top-1.5 z-10 cursor-grab rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground active:cursor-grabbing group-hover:opacity-100"
+          aria-label="Drag to reorder"
+          type="button"
+        >
+          <GripVertical className="h-3 w-3" />
+        </button>
+      )}
       <button
         onClick={handleRemove}
         className="absolute right-1.5 top-1.5 z-10 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
@@ -149,7 +222,7 @@ function MarketTile({
       >
         <X className="h-3 w-3" />
       </button>
-      <div className="flex items-start justify-between gap-2 pr-4">
+      <div className={`flex items-start justify-between gap-2 pr-4 ${dragHandle ? "pl-3" : ""}`}>
         <div className="min-w-0">
           <div className="truncate text-xs font-medium text-muted-foreground group-hover:text-foreground">
             {def.label}
