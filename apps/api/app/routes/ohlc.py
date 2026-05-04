@@ -3,8 +3,21 @@ from pydantic import BaseModel
 import yfinance as yf
 
 from ..services.holdings import yf_symbol
+from tradingagents.dataflows.y_finance import _resolve_symbol
 
 router = APIRouter(prefix="/ohlc", tags=["ohlc"])
+
+
+def _resolve_yf(symbol: str, exchange: str) -> str:
+    """Map (symbol, exchange) → yfinance symbol with international fallback.
+
+    yf_symbol handles known mappings (BIST→.IS, CRYPTO→-USD). _resolve_symbol
+    then probes bare + international suffixes if the user mistagged exchange
+    (e.g. exchange=US but symbol is PGSUS, a BIST ticker). For already-qualified
+    symbols (.IS, -USD, ^GSPC, =F) _resolve_symbol short-circuits and returns
+    the input unchanged.
+    """
+    return _resolve_symbol(yf_symbol(symbol, exchange))
 
 
 class Bar(BaseModel):
@@ -35,7 +48,7 @@ def get_quote(
     exchange: str = Query("US"),
 ):
     """Light-weight quote: last price + 1d change + tiny sparkline."""
-    yf_sym = yf_symbol(symbol, exchange)
+    yf_sym = _resolve_yf(symbol, exchange)
     try:
         h = yf.Ticker(yf_sym).history(period="5d", interval="1d")
     except Exception as e:
@@ -70,7 +83,7 @@ def get_ohlc(
     if interval not in _VALID_INTERVALS:
         raise HTTPException(400, f"interval must be one of {sorted(_VALID_INTERVALS)}")
 
-    yf_sym = yf_symbol(symbol, exchange)
+    yf_sym = _resolve_yf(symbol, exchange)
     try:
         h = yf.Ticker(yf_sym).history(period=period, interval=interval)
     except Exception as e:

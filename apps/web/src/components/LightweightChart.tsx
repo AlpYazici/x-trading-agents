@@ -40,9 +40,25 @@ const RANGES: { label: string; r: Range }[] = [
 
 type ChartType = "candle" | "area";
 
+// Auto-detect exchange from symbol pattern. Caller can still override.
+function detectExchange(sym: string, fallback: string): string {
+  const s = sym.toUpperCase();
+  if (s.endsWith(".IS")) return "BIST";
+  if (s.endsWith(".L") || s.endsWith(".DE") || s.endsWith(".PA") || s.endsWith(".AS"))
+    return "US"; // backend yf_symbol passes these through
+  if (s.startsWith("^") || s.includes("=")) return "US"; // indices/futures/FX raw
+  if (s.endsWith("-USD") || s.endsWith("USDT")) return "CRYPTO";
+  // common crypto bare tickers
+  const cryptoBases = new Set([
+    "BTC","ETH","SOL","XRP","DOGE","ADA","AVAX","MATIC","LINK","DOT","LTC","BCH"
+  ]);
+  if (cryptoBases.has(s)) return "CRYPTO";
+  return fallback;
+}
+
 export function LightweightChart({
   symbol,
-  exchange = "US",
+  exchange,
   height = 460,
   defaultRange = 3,
   defaultType = "candle",
@@ -57,12 +73,13 @@ export function LightweightChart({
   const [rangeIdx, setRangeIdx] = useState(defaultRange);
   const [chartType, setChartType] = useState<ChartType>(defaultType);
   const range = RANGES[rangeIdx].r;
+  const effectiveExchange = exchange || detectExchange(symbol, "US");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["ohlc", symbol, exchange, range.period, range.interval],
+    queryKey: ["ohlc", symbol, effectiveExchange, range.period, range.interval],
     queryFn: () =>
       apiGet<Bar[]>(
-        `/ohlc?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&period=${range.period}&interval=${range.interval}`
+        `/ohlc?symbol=${encodeURIComponent(symbol)}&exchange=${effectiveExchange}&period=${range.period}&interval=${range.interval}`
       ),
     refetchInterval: 30_000,
     staleTime: 20_000,
