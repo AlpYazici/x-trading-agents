@@ -18,6 +18,7 @@ from .routes import costs as costs_routes
 from .routes import schedules as schedules_routes
 from .routes import insider as insider_routes
 from .routes import backtest as backtest_routes
+from .routes import screener as screener_routes
 from .services import scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -134,3 +135,4 @@ app.include_router(costs_routes.router)
 app.include_router(schedules_routes.router)
 app.include_router(insider_routes.router)
 app.include_router(backtest_routes.router)
+app.include_router(screener_routes.router)
