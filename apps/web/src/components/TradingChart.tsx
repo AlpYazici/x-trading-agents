@@ -10,6 +10,7 @@ import {
   type Chart,
   type KLineData,
   type OverlayTemplate,
+  type OverlayFigure,
 } from "klinecharts";
 import {
   Minus,
@@ -85,10 +86,12 @@ function ensureCustomOverlays() {
     needDefaultPointFigure: true,
     needDefaultXAxisFigure: true,
     needDefaultYAxisFigure: true,
-    createPointFigures: ({ coordinates }) => {
+    createPointFigures: ({ coordinates, overlay }) => {
       if (coordinates.length < 2) return [];
       const [a, b] = coordinates;
-      return [
+      const points = overlay.points ?? [];
+
+      const figures: OverlayFigure[] = [
         {
           type: "polygon",
           attrs: {
@@ -107,6 +110,78 @@ function ensureCustomOverlays() {
           },
         },
       ];
+
+      // Corner labels with price delta + percent change (top-vs-bottom of the
+      // rectangle, regardless of which corner the user clicked first).
+      if (points.length >= 2) {
+        const v0 = points[0].value ?? 0;
+        const v1 = points[1].value ?? 0;
+        const high = Math.max(v0, v1);
+        const low = Math.min(v0, v1);
+        const delta = high - low;
+        const pct = low ? (delta / low) * 100 : 0;
+        const bars = Math.abs(
+          (points[1].dataIndex ?? 0) - (points[0].dataIndex ?? 0)
+        );
+
+        // Pixel coords for the rectangle's top-right and bottom-right corners.
+        const rightX = Math.max(a.x, b.x);
+        const topY = Math.min(a.y, b.y);
+        const bottomY = Math.max(a.y, b.y);
+
+        const upLabel = `+${delta.toFixed(2)}  (+${pct.toFixed(2)}%)`;
+        const downLabel = `-${delta.toFixed(2)}  (-${pct.toFixed(2)}%)`;
+
+        const labelStyleBase = {
+          color: "#fff",
+          size: 10,
+          paddingLeft: 6,
+          paddingRight: 6,
+          paddingTop: 3,
+          paddingBottom: 3,
+          borderRadius: 4,
+          family: "ui-sans-serif, system-ui",
+          weight: "600",
+        };
+
+        figures.push(
+          {
+            type: "text",
+            attrs: {
+              x: rightX - 4,
+              y: topY + 4,
+              text: upLabel,
+              align: "right",
+              baseline: "top",
+            },
+            styles: { ...labelStyleBase, backgroundColor: "#10b981" },
+          },
+          {
+            type: "text",
+            attrs: {
+              x: rightX - 4,
+              y: bottomY - 4,
+              text: downLabel,
+              align: "right",
+              baseline: "bottom",
+            },
+            styles: { ...labelStyleBase, backgroundColor: "#ef4444" },
+          },
+          {
+            type: "text",
+            attrs: {
+              x: rightX - 4,
+              y: (topY + bottomY) / 2,
+              text: `${bars} bars`,
+              align: "right",
+              baseline: "middle",
+            },
+            styles: { ...labelStyleBase, backgroundColor: "rgba(0,0,0,0.6)" },
+          }
+        );
+      }
+
+      return figures;
     },
   };
 
