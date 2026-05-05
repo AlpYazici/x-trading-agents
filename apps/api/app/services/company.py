@@ -14,6 +14,7 @@ import pandas as pd
 import yfinance as yf
 
 from ..routes.ohlc import _resolve_yf  # symbol/exchange → yfinance ticker
+from . import financial_datasets as fd
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,9 @@ def get_profile(symbol: str, exchange: str) -> dict:
         "short_ratio": info.get("shortRatio"),
         "short_percent_of_float": info.get("shortPercentOfFloat"),
     }
+    # Fill any missing ratios from Financial Datasets (no-op if unconfigured
+    # or symbol isn't a plain US ticker).
+    out = fd.merge_into_profile(out)
     _profile_cache[yf_sym] = (out, now)
     return out
 

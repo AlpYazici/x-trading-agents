@@ -102,7 +102,19 @@ export default function RunDetailPage(props: { params: Params }) {
             </span>
           </h1>
         </div>
-        {run && <StatusDot status={run.status} />}
+        <div className="flex items-center gap-3">
+          {run && (
+            <a
+              href={`/api/runs/${runId}/scratchpad`}
+              download
+              title="Download every event for this run as JSONL"
+              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+            >
+              ⬇ Scratchpad
+            </a>
+          )}
+          {run && <StatusDot status={run.status} />}
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
