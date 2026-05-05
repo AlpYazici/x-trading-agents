@@ -15,6 +15,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { apiGet } from "@/lib/api";
+import { AttributionPanel } from "@/components/AttributionPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -118,6 +119,9 @@ export default function ReflectionPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Performance attribution — outcomes rolled up by ticker / sector / signal */}
+      <AttributionPanel />
 
       {/* Top stats */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
