@@ -11,7 +11,7 @@ import {
   PlayCircle,
   Brain,
 } from "lucide-react";
-import { apiGet, apiPost, type Run, type Order } from "@/lib/api";
+import { apiGet, apiPost, parseUtcDate, type Run, type Order } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,9 @@ export default function RecommendationsPage() {
 
   const filtered = (runs ?? []).filter((r) => {
     if (r.status !== "completed") return false;
-    const t = new Date(r.started_at).getTime();
+    const d = parseUtcDate(r.started_at);
+    if (!d) return false;
+    const t = d.getTime();
     if (tab === "today") return t >= todayStart;
     if (tab === "yesterday") return t >= yesterdayStart && t < todayStart;
     return t >= weekStart;
@@ -49,7 +51,9 @@ export default function RecommendationsPage() {
   const byTicker = new Map<string, Run>();
   for (const r of filtered) {
     const prev = byTicker.get(r.ticker);
-    if (!prev || new Date(r.started_at) > new Date(prev.started_at)) {
+    const rT = parseUtcDate(r.started_at)?.getTime() ?? 0;
+    const pT = prev ? (parseUtcDate(prev.started_at)?.getTime() ?? 0) : -1;
+    if (!prev || rT > pT) {
       byTicker.set(r.ticker, r);
     }
   }
@@ -214,7 +218,7 @@ function RecCard({
               </Badge>
             </div>
             <div className="text-[11px] text-muted-foreground">
-              {new Date(run.started_at).toLocaleString("en-US", {
+              {parseUtcDate(run.started_at)?.toLocaleString("en-US", {
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",

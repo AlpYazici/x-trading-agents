@@ -3,6 +3,19 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "/api";
 
+/**
+ * The Python API serializes datetimes as naive ISO strings (no timezone
+ * marker, e.g. "2026-05-04T01:05:28.730236") but the values are in UTC.
+ * `new Date(...)` on a naive ISO string parses as LOCAL time, so users east
+ * of UTC see runs shift into the past and "today" filters miss them.
+ * Force UTC interpretation by appending Z when no TZ is present.
+ */
+export function parseUtcDate(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) return new Date(s);
+  return new Date(s + "Z");
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);

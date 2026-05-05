@@ -58,6 +58,12 @@ def _fetch_s3_json(url: str) -> list[dict]:
     return data
 
 
+def _isfinite(v: float) -> bool:
+    """Reject NaN / inf so JSON serialization doesn't blow up."""
+    import math
+    return math.isfinite(v)
+
+
 def _parse_amount(amount: str | None) -> tuple[float | None, float | None]:
     """Parse '$15,001 - $50,000' → (15001.0, 50000.0). Tolerates many shapes."""
     if not amount or not isinstance(amount, str):
@@ -202,6 +208,10 @@ def _corporate_cached(symbol: str, ts_bucket: int) -> list[dict]:
         value = r.get("Value")
         try:
             v = float(value) if value is not None else None
+            # pandas returns NaN for missing values; NaN survives float() but
+            # breaks JSON serialization downstream.
+            if v is not None and not _isfinite(v):
+                v = None
         except (TypeError, ValueError):
             v = None
         out.append({
