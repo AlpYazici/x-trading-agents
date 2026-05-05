@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Run rate limit — protects Anthropic budget from runaway loops
     run_rate_limit_per_day: int = 50
 
+    # Optional: Financial Datasets API key (https://financialdatasets.ai)
+    # Falls back here when yfinance .info / .financials are sparse —
+    # especially useful for non-US tickers and for ratios yfinance doesn't expose.
+    financial_datasets_api_key: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
