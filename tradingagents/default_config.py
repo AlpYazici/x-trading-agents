@@ -15,6 +15,10 @@ DEFAULT_CONFIG = {
     "llm_provider": "anthropic",
     "deep_think_llm": "claude-sonnet-4-6",
     "quick_think_llm": "claude-sonnet-4-6",
+    # Backend that actually performs LLM calls.
+    #   "sdk": Claude Agent SDK via local `claude` CLI (uses Max subscription).
+    #   "langchain": LangChain ChatAnthropic via API key (pay-as-you-go).
+    "llm_backend": "sdk",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a

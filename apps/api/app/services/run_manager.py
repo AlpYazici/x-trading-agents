@@ -131,6 +131,7 @@ class _Manager:
             cfg["llm_provider"] = "anthropic"
             cfg["deep_think_llm"] = settings.deep_think_llm
             cfg["quick_think_llm"] = settings.quick_think_llm
+            cfg["llm_backend"] = settings.llm_backend
             cfg["max_debate_rounds"] = settings.max_debate_rounds
             # Enable checkpointing so a run survives an API restart.
             # If the worker dies mid-run, the next /runs POST for the same
@@ -138,12 +139,24 @@ class _Manager:
             cfg["checkpoint_enabled"] = True
 
             callback = _StreamingCallback(h, loop)
-            from . import cost_tracking
-            cost_callback = cost_tracking.CostTrackingCallback(run_id=h.run_id)
+            callbacks: list = [callback]
+
+            # On the SDK backend, ANTHROPIC_API_KEY must be unset so the local
+            # `claude` CLI's stored Max-subscription credentials are used. The
+            # LangChain cost callback is unnecessary — SdkLlm writes LlmCost
+            # rows itself from each ResultMessage.
+            if settings.llm_backend == "sdk":
+                import os
+                os.environ.pop("ANTHROPIC_API_KEY", None)
+            else:
+                from . import cost_tracking
+                callbacks.append(cost_tracking.CostTrackingCallback(run_id=h.run_id))
+
+            run_id_for_graph = h.run_id
 
             def _run() -> tuple[dict, str]:
-                ta = TradingAgentsGraph(debug=False, config=cfg, callbacks=[callback, cost_callback])
-                final_state, signal = ta.propagate(h.ticker, h.trade_date)
+                ta = TradingAgentsGraph(debug=False, config=cfg, callbacks=callbacks)
+                final_state, signal = ta.propagate(h.ticker, h.trade_date, run_id=run_id_for_graph)
                 return final_state, signal
 
             final_state, signal = await loop.run_in_executor(None, _run)

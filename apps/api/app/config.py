@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     deep_think_llm: str = "claude-sonnet-4-6"
     quick_think_llm: str = "claude-sonnet-4-6"
+    # "sdk" → Agent SDK via local `claude` CLI (Max subscription).
+    # "langchain" → ChatAnthropic via API key (pay-as-you-go).
+    llm_backend: str = "sdk"
     max_debate_rounds: int = 1
 
     # Run rate limit — protects Anthropic budget from runaway loops

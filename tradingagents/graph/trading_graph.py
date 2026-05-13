@@ -76,28 +76,32 @@ class TradingAgentsGraph:
         os.makedirs(self.config["data_cache_dir"], exist_ok=True)
         os.makedirs(self.config["results_dir"], exist_ok=True)
 
-        # Initialize LLMs with provider-specific thinking configuration
-        llm_kwargs = self._get_provider_kwargs()
-
-        # Add callbacks to kwargs if provided (passed to LLM constructor)
-        if self.callbacks:
-            llm_kwargs["callbacks"] = self.callbacks
-
-        deep_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["deep_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-        quick_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["quick_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-
-        self.deep_thinking_llm = deep_client.get_llm()
-        self.quick_thinking_llm = quick_client.get_llm()
+        # Initialize LLMs. Two backends supported:
+        #   "sdk"      → Claude Agent SDK (Max subscription via local CLI)
+        #   "langchain" → ChatAnthropic via API key (pay-as-you-go)
+        backend = self.config.get("llm_backend", "sdk")
+        if backend == "sdk":
+            from tradingagents.llm_clients.agent_sdk_client import SdkLlm
+            self.deep_thinking_llm = SdkLlm(self.config["deep_think_llm"], role="deep")
+            self.quick_thinking_llm = SdkLlm(self.config["quick_think_llm"], role="quick")
+        else:
+            llm_kwargs = self._get_provider_kwargs()
+            if self.callbacks:
+                llm_kwargs["callbacks"] = self.callbacks
+            deep_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["deep_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+            quick_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["quick_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+            self.deep_thinking_llm = deep_client.get_llm()
+            self.quick_thinking_llm = quick_client.get_llm()
         
         self.memory_log = TradingMemoryLog(self.config)
 
@@ -114,6 +118,7 @@ class TradingAgentsGraph:
             self.deep_thinking_llm,
             self.tool_nodes,
             self.conditional_logic,
+            backend=backend,
         )
 
         self.propagator = Propagator()
@@ -263,14 +268,25 @@ class TradingAgentsGraph:
         if updates:
             self.memory_log.batch_update_with_outcomes(updates)
 
-    def propagate(self, company_name, trade_date):
+    def propagate(self, company_name, trade_date, run_id=None):
         """Run the trading agents graph for a company on a specific date.
 
         When ``checkpoint_enabled`` is set in config, the graph is recompiled
         with a per-ticker SqliteSaver so a crashed run can resume from the last
         successful node on a subsequent invocation with the same ticker+date.
+
+        ``run_id`` (optional) propagates to ``SdkLlm`` instances so each LLM
+        call's cost row is attached to the correct row in the ``LlmCost`` table.
+        Ignored on the LangChain backend (cost callback handles that path).
         """
         self.ticker = company_name
+
+        # Wire run_id into the SDK LLM handles so cost tracking knows which row
+        # to write under. Only meaningful when llm_backend == "sdk".
+        if hasattr(self.deep_thinking_llm, "run_id"):
+            self.deep_thinking_llm.run_id = run_id
+        if hasattr(self.quick_thinking_llm, "run_id"):
+            self.quick_thinking_llm.run_id = run_id
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.
         self._resolve_pending_entries(company_name)

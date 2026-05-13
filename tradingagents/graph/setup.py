@@ -19,12 +19,32 @@ class GraphSetup:
         deep_thinking_llm: Any,
         tool_nodes: Dict[str, ToolNode],
         conditional_logic: ConditionalLogic,
+        backend: str = "sdk",
     ):
-        """Initialize with required components."""
+        """Initialize with required components.
+
+        ``backend`` chooses analyst implementations:
+          - "sdk":       single-shot pre-fetch analysts (``sdk_analysts``)
+          - "langchain": multi-turn tool-using analysts (originals)
+        """
         self.quick_thinking_llm = quick_thinking_llm
         self.deep_thinking_llm = deep_thinking_llm
         self.tool_nodes = tool_nodes
         self.conditional_logic = conditional_logic
+        self.backend = backend
+
+        # Pick the analyst factory module based on backend.
+        if backend == "sdk":
+            from tradingagents.agents.analysts import sdk_analysts as _a
+            self._mk_market = _a.create_market_analyst
+            self._mk_social = _a.create_social_media_analyst
+            self._mk_news = _a.create_news_analyst
+            self._mk_fundamentals = _a.create_fundamentals_analyst
+        else:
+            self._mk_market = create_market_analyst
+            self._mk_social = create_social_media_analyst
+            self._mk_news = create_news_analyst
+            self._mk_fundamentals = create_fundamentals_analyst
 
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]
@@ -47,30 +67,22 @@ class GraphSetup:
         tool_nodes = {}
 
         if "market" in selected_analysts:
-            analyst_nodes["market"] = create_market_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["market"] = self._mk_market(self.quick_thinking_llm)
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
-            analyst_nodes["social"] = create_social_media_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["social"] = self._mk_social(self.quick_thinking_llm)
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
-            analyst_nodes["news"] = create_news_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["news"] = self._mk_news(self.quick_thinking_llm)
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
-                self.quick_thinking_llm
-            )
+            analyst_nodes["fundamentals"] = self._mk_fundamentals(self.quick_thinking_llm)
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
