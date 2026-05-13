@@ -13,7 +13,7 @@ DEFAULT_CONFIG = {
     "memory_log_max_entries": None,
     # LLM settings
     "llm_provider": "anthropic",
-    "deep_think_llm": "claude-opus-4-7",
+    "deep_think_llm": "claude-sonnet-4-6",
     "quick_think_llm": "claude-sonnet-4-6",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).

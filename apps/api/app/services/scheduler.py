@@ -74,7 +74,7 @@ async def _fire(schedule_id: int) -> None:
     # Hybrid: fixed watchlist + top screener picks (default 5 extra)
     from .screener import get_hybrid_symbols
     try:
-        combined = get_hybrid_symbols(fixed_symbols, top_n_screener=5)
+        combined = get_hybrid_symbols(fixed_symbols, top_n_screener=2)
         symbols = [c["symbol"] for c in combined]
         sources = {c["symbol"]: c["source"] for c in combined}
         logger.info("schedule %s hybrid expansion: watchlist=%d screener=%d",

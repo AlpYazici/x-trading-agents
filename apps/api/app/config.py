@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     risk_stop_loss_pct: float = 0.05
     risk_take_profit_pct: float = 0.10
 
-    deep_think_llm: str = "claude-opus-4-7"
+    deep_think_llm: str = "claude-sonnet-4-6"
     quick_think_llm: str = "claude-sonnet-4-6"
     max_debate_rounds: int = 1
 
